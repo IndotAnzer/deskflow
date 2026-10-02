@@ -166,6 +166,7 @@ protected:
   // KeyState overrides
   void getKeyMap(deskflow::KeyMap &keyMap) override;
   void fakeKey(const Keystroke &keystroke) override;
+  void synchronizeInputMethod(const std::string &lang) override;
   KeyModifierMask &getActiveModifiersRValue() override;
 
 private:

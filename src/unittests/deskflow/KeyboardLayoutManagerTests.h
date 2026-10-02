@@ -21,6 +21,8 @@ private Q_SLOTS:
   void missedLayout();
   void serializeLocalLayouts();
   void layoutInstall();
+  void normalizeLanguageCode_data();
+  void normalizeLanguageCode();
 
 private:
   Log m_log;

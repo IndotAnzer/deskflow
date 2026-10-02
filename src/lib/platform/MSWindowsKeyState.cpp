@@ -15,6 +15,27 @@
 #include "platform/MSWindowsHandle.h"
 #include "platform/MSWindowsHook.h"
 
+#include <imm.h>
+
+namespace {
+
+// IMM compatibility commands supported by the default IME window. The public
+// Windows SDK's imm.h does not expose these command constants.
+constexpr WPARAM kImeGetConversionMode = 0x0001;
+constexpr WPARAM kImeSetConversionMode = 0x0002;
+constexpr WPARAM kImeGetOpenStatus = 0x0005;
+constexpr WPARAM kImeSetOpenStatus = 0x0006;
+
+// An input context belongs to the focused application's thread. Use its default IME
+// window instead of changing an ImmGetContext() context from the Deskflow thread.
+bool imeControl(HWND imeWindow, WPARAM command, LPARAM value, DWORD_PTR &result)
+{
+  return SendMessageTimeout(imeWindow, WM_IME_CONTROL, command, value, SMTO_ABORTIFHUNG | SMTO_BLOCK, 100, &result) !=
+         0;
+}
+
+} // namespace
+
 // extended mouse buttons
 #if !defined(VK_XBUTTON1)
 #define VK_XBUTTON1 0x05
@@ -740,6 +761,9 @@ void MSWindowsKeyState::sendKeyEvent(
 
 void MSWindowsKeyState::fakeKeyDown(KeyID id, KeyModifierMask mask, KeyButton button, const std::string &lang)
 {
+  // A Mac primary sends Caps Lock's resulting state, not its physical key.
+  // Align it even for shortcuts, whose character mapping preserves Caps Lock.
+  synchronizeCapsLock(mask);
   KeyState::fakeKeyDown(id, mask, button, lang);
 }
 
@@ -747,6 +771,7 @@ bool MSWindowsKeyState::fakeKeyRepeat(
     KeyID id, KeyModifierMask mask, int32_t count, KeyButton button, const std::string &lang
 )
 {
+  synchronizeCapsLock(mask);
   return KeyState::fakeKeyRepeat(id, mask, count, button, lang);
 }
 
@@ -1160,6 +1185,55 @@ void MSWindowsKeyState::getKeyMap(deskflow::KeyMap &keyMap)
 
   // restore keyboard layout
   ActivateKeyboardLayout(activeLayout, 0);
+}
+
+void MSWindowsKeyState::synchronizeInputMethod(const std::string &lang)
+{
+  if (!isMacCapsLockSyncEnabled()) {
+    return;
+  }
+  if (lang != "zh" && lang != "en") {
+    return;
+  }
+
+  const HWND foreground = GetForegroundWindow();
+  if (!foreground) {
+    return;
+  }
+  const DWORD thread = GetWindowThreadProcessId(foreground, nullptr);
+  const HKL layout = GetKeyboardLayout(thread);
+  if (PRIMARYLANGID(LOWORD(reinterpret_cast<ULONG_PTR>(layout))) != LANG_CHINESE) {
+    return;
+  }
+
+  GUITHREADINFO info = {sizeof(GUITHREADINFO)};
+  if (!GetGUIThreadInfo(thread, &info) || !info.hwndFocus) {
+    return;
+  }
+  const HWND imeWindow = ImmGetDefaultIMEWnd(info.hwndFocus);
+  if (!imeWindow) {
+    return;
+  }
+
+  DWORD_PTR open = 0;
+  if (!imeControl(imeWindow, kImeGetOpenStatus, 0, open)) {
+    return;
+  }
+  const bool chinese = lang == "zh";
+  DWORD_PTR result = 0;
+  if ((open != 0) != chinese && !imeControl(imeWindow, kImeSetOpenStatus, chinese, result)) {
+    return;
+  }
+
+  DWORD_PTR conversion = 0;
+  if (!imeControl(imeWindow, kImeGetConversionMode, 0, conversion)) {
+    return;
+  }
+  // Preserve full-width, punctuation and other IME preferences; only change native mode.
+  const DWORD_PTR desired = chinese ? conversion | IME_CMODE_NATIVE : conversion & ~DWORD_PTR(IME_CMODE_NATIVE);
+  if (desired != conversion && !imeControl(imeWindow, kImeSetConversionMode, static_cast<LPARAM>(desired), result)) {
+    LOG_DEBUG("failed to synchronize Chinese IME conversion mode");
+  }
 }
 
 void MSWindowsKeyState::fakeKey(const Keystroke &keystroke)
