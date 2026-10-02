@@ -19,6 +19,13 @@
 
 namespace {
 
+// IMM compatibility commands supported by the default IME window. The public
+// Windows SDK's imm.h does not expose these command constants.
+constexpr WPARAM kImeGetConversionMode = 0x0001;
+constexpr WPARAM kImeSetConversionMode = 0x0002;
+constexpr WPARAM kImeGetOpenStatus = 0x0005;
+constexpr WPARAM kImeSetOpenStatus = 0x0006;
+
 // An input context belongs to the focused application's thread. Use its default IME
 // window instead of changing an ImmGetContext() context from the Deskflow thread.
 bool imeControl(HWND imeWindow, WPARAM command, LPARAM value, DWORD_PTR &result)
@@ -1209,22 +1216,22 @@ void MSWindowsKeyState::synchronizeInputMethod(const std::string &lang)
   }
 
   DWORD_PTR open = 0;
-  if (!imeControl(imeWindow, IMC_GETOPENSTATUS, 0, open)) {
+  if (!imeControl(imeWindow, kImeGetOpenStatus, 0, open)) {
     return;
   }
   const bool chinese = lang == "zh";
   DWORD_PTR result = 0;
-  if ((open != 0) != chinese && !imeControl(imeWindow, IMC_SETOPENSTATUS, chinese, result)) {
+  if ((open != 0) != chinese && !imeControl(imeWindow, kImeSetOpenStatus, chinese, result)) {
     return;
   }
 
   DWORD_PTR conversion = 0;
-  if (!imeControl(imeWindow, IMC_GETCONVERSIONMODE, 0, conversion)) {
+  if (!imeControl(imeWindow, kImeGetConversionMode, 0, conversion)) {
     return;
   }
   // Preserve full-width, punctuation and other IME preferences; only change native mode.
   const DWORD_PTR desired = chinese ? conversion | IME_CMODE_NATIVE : conversion & ~DWORD_PTR(IME_CMODE_NATIVE);
-  if (desired != conversion && !imeControl(imeWindow, IMC_SETCONVERSIONMODE, static_cast<LPARAM>(desired), result)) {
+  if (desired != conversion && !imeControl(imeWindow, kImeSetConversionMode, static_cast<LPARAM>(desired), result)) {
     LOG_DEBUG("failed to synchronize Chinese IME conversion mode");
   }
 }
