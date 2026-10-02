@@ -7,6 +7,7 @@ on:
   push:
     branches:
       - 'build/ime-test-installers*'
+      - 'build/ime-qt-extraction-fix'
   workflow_dispatch:
 
 permissions:
@@ -39,16 +40,6 @@ jobs:
             qt-version: 6.11.3
             vcpkg-triplet: arm64-windows
             config-args: -G Ninja
-          - name: macos-arm64
-            runner: macos-15
-            os: macos
-            qt-version: 6.11.3
-            config-args: -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14
-          - name: macos-x64
-            runner: macos-15-intel
-            os: macos
-            qt-version: 6.9.3
-            config-args: -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=12 -DCMAKE_OSX_SYSROOT=/Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
     steps:
       - name: Checkout test source
         uses: actions/checkout@v6
