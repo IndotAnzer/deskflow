@@ -9,6 +9,7 @@ on:
       - 'build/ime-test-installers*'
       - 'build/ime-qt-extraction-fix'
       - 'build/ime-windows-packages'
+      - 'build/ime-windows-native'
   workflow_dispatch:
 
 permissions:
@@ -67,7 +68,7 @@ jobs:
           cmake_args=()
           if [ "$RUNNER_OS" == "Windows" ]; then
             cmake_args+=("-DCMAKE_TOOLCHAIN_FILE=$(pwd -W)/vcpkg/scripts/buildsystems/vcpkg.cmake")
-            cmake_args+=("-DVCPKG_TARGET_TRIPLET=${{ matrix.target.vcpkg-triplet }}")
+            cmake_args+=("-DVCPKG_TARGET_TRIPLET=${{ matrix.target.vcpkg-triplet }}" "-DVCPKG_MANIFEST_MODE=OFF")
           fi
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_INSTALLER=ON \
             -DSKIP_BUILD_TESTS=ON -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
