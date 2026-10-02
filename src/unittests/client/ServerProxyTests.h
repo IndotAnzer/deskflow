@@ -16,6 +16,7 @@ class ServerProxyTests : public QObject
 
 private Q_SLOTS:
   void initTestCase();
+  void parseInputState_withoutKeyEvent();
   void handleKeepAliveAlarm_timeout_queuesDisconnectRequest();
   void handleData_incompleteMessage_queuesDisconnectRequest();
   void parseHandshakeMessage_protocolError_queuesRefusalRequest();

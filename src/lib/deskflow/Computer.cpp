@@ -1,5 +1,6 @@
 /*
  * Deskflow -- mouse and keyboard sharing utility
+ * SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
  * SPDX-FileCopyrightText: (C) 2012 - 2016 Synergy App Ltd
  * SPDX-FileCopyrightText: (C) 2003 Chris Schoeneman
  * SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
@@ -217,6 +218,13 @@ void Computer::grabClipboard(ClipboardID id)
 void Computer::screensaver(bool) const
 {
   // do nothing
+}
+
+void Computer::synchronizeInputState(KeyModifierMask mask, const std::string &lang)
+{
+  if (!m_isPrimary) {
+    m_computer->synchronizeInputState(mask, lang);
+  }
 }
 
 void Computer::keyDown(KeyID id, KeyModifierMask mask, KeyButton button, const std::string &lang)

@@ -1018,6 +1018,14 @@ Additionally, check you are able to %1 the server config file: %2</source>
         <translation>使用相对鼠标移动(&amp;R)</translation>
     </message>
     <message>
+        <source>Handle Caps Lock on Mac and sync input state</source>
+        <translation>由 Mac 处理 Caps Lock 并同步输入状态</translation>
+    </message>
+    <message>
+        <source>Let Mac handle Caps Lock locally and send input source changes to Windows immediately. Enable keyboard language synchronization on Windows to also synchronize Chinese/English input mode. Input state is checked again before typing.</source>
+        <translation>让 Mac 在本地处理 Caps Lock，并在输入源变化后立即通知 Windows。若要同步中英文输入模式，请开启 Windows 端的键盘语言同步。输入前还会再次检查输入状态。</translation>
+    </message>
+    <message>
         <source>Don&apos;t take &amp;foreground window (Windows only)</source>
         <translation>不获取前台窗口焦点 (仅限 Windows)(&amp;F)</translation>
     </message>

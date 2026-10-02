@@ -1,3 +1,4 @@
+# SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
 # SPDX-FileCopyrightText: 2025 Chris Rizzitello <sithlord48@gmail.com>
 # SPDX-License-Identifier: MIT
 
@@ -65,3 +66,15 @@ path = [
 ]
 SPDX-FileCopyrightText = "Deskflow Developers"
 SPDX-License-Identifier = "GPL-2.0-only WITH LicenseRef-OpenSSL-Exception"
+
+[[annotations]]
+path = "src/lib/gui/dialogs/ServerConfigDialog.ui"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "(C) 2026 Deskflow Developers"
+SPDX-License-Identifier = "GPL-2.0-only WITH LicenseRef-OpenSSL-Exception"
+
+[[annotations]]
+path = "translations/deskflow_zh_CN.ts"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "(C) 2026 Deskflow Developers"
+SPDX-License-Identifier = "MIT"

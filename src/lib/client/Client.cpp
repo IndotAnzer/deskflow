@@ -14,6 +14,7 @@
 #include "client/ServerProxy.h"
 #include "client/ServerProxy1_7.h"
 #include "client/ServerProxy1_8.h"
+#include "client/ServerProxy1_9.h"
 #include "common/NetworkProtocol.h"
 #include "common/Settings.h"
 #include "deskflow/Clipboard.h"
@@ -268,6 +269,13 @@ void Client::setClipboardDirty(ClipboardID, bool)
   assert(0 && "shouldn't be called");
 }
 
+void Client::synchronizeInputState(KeyModifierMask mask, const std::string &lang)
+{
+  if (m_ready && m_active) {
+    m_computer->synchronizeInputState(mask, lang);
+  }
+}
+
 void Client::keyDown(KeyID id, KeyModifierMask mask, KeyButton button, const std::string &lang)
 {
   m_computer->keyDown(id, mask, button, lang);
@@ -482,6 +490,9 @@ bool Client::setupComputer(int16_t protocolMinor)
     break;
   case 8:
     m_server = new ServerProxy1_8(this, m_stream, m_events);
+    break;
+  case 9:
+    m_server = new ServerProxy1_9(this, m_stream, m_events);
     break;
   default:
     break;

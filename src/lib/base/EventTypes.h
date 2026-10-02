@@ -1,5 +1,6 @@
 /*
  * Deskflow -- mouse and keyboard sharing utility
+ * SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
  * SPDX-FileCopyrightText: (C) 2023 Input-Leap Developers
  * SPDX-FileCopyrightText: (C) 2013 - 2016 Synergy App Ltd
  * SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
@@ -164,6 +165,9 @@ enum class EventTypes : uint32_t
   KeyStateKeyUp,
   /// This event is sent when key is repeated. Event data is a pointer to KeyInfo.
   KeyStateKeyRepeat,
+
+  /// Source input state changed. Event data is KeyInfo containing the current modifier mask.
+  PrimaryComputerInputStateChanged,
 
   /// This event is sent when button is down. Event data is a pointer to ButtonInfo
   PrimaryComputerButtonDown,

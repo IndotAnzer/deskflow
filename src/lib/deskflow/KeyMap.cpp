@@ -1,5 +1,6 @@
 /*
  * Deskflow -- mouse and keyboard sharing utility
+ * SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
  * SPDX-FileCopyrightText: (C) 2012 - 2016 Synergy App Ltd
  * SPDX-FileCopyrightText: (C) 2005 Chris Schoeneman
  * SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
@@ -296,6 +297,11 @@ const KeyMap::KeyItem *KeyMap::mapKey(
 void KeyMap::setLanguageData(std::vector<std::string> layouts)
 {
   m_keyboardLayouts = std::move(layouts);
+}
+
+void KeyMap::mapLanguage(Keystrokes &keys, int32_t group, const std::string &lang) const
+{
+  addGroupToKeystroke(keys, group, lang);
 }
 
 int32_t KeyMap::getLanguageGroupID(int32_t group, const std::string &lang) const

@@ -1,5 +1,6 @@
 /*
  * Deskflow -- mouse and keyboard sharing utility
+ * SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
  * SPDX-FileCopyrightText: (C) 2012 - 2016 Synergy App Ltd
  * SPDX-FileCopyrightText: (C) 2005 Chris Schoeneman
  * SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
@@ -218,6 +219,7 @@ public:
   ) const;
 
   void setLanguageData(std::vector<std::string> layouts);
+  void mapLanguage(Keystrokes &keys, int32_t group, const std::string &lang) const;
 
   //! Get number of groups
   /*!

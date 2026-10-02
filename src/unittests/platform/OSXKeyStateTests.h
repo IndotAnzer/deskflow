@@ -1,5 +1,6 @@
 /*
  * Deskflow -- mouse and keyboard sharing utility
+ * SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
  * SPDX-FileCopyrightText: (C) 2025 Chris Rizzitello <sithlord48@gmail.com>
  * SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
  */
@@ -20,6 +21,9 @@ private Q_SLOTS:
   void fakePollShift();
   void fakePollChar();
   void fakePollCharWithModifier();
+  void capsLock_updatesStateWithoutForwardingKey();
+  void mapKeyFromEvent_usesActualCapsLockState();
+  void capsLock_disabledForwardsKey();
 
 private:
   bool isKeyPressed(const OSXKeyState &keyState, KeyButton button);

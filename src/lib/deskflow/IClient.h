@@ -1,5 +1,6 @@
 /*
  * Deskflow -- mouse and keyboard sharing utility
+ * SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
  * SPDX-FileCopyrightText: (C) 2012 - 2016 Synergy App Ltd
  * SPDX-FileCopyrightText: (C) 2002 Chris Schoeneman
  * SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
@@ -25,6 +26,11 @@ class IClient : public IComputer
 public:
   //! @name manipulators
   //@{
+
+  //! Synchronize input state without synthesizing a key. Older protocol proxies ignore it.
+  virtual void synchronizeInputState(KeyModifierMask, const std::string &)
+  {
+  }
 
   //! Enter computer
   /*!

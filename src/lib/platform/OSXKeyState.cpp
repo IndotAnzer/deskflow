@@ -1,5 +1,6 @@
 /*
  * Deskflow -- mouse and keyboard sharing utility
+ * SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
  * SPDX-FileCopyrightText: (C) 2012 - 2016 Synergy App Ltd
  * SPDX-FileCopyrightText: (C) 2004 Chris Schoeneman
  * SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
@@ -308,6 +309,12 @@ KeyButton OSXKeyState::mapKeyFromEvent(KeyIDs &ids, KeyModifierMask *maskOut, CG
   if (maskOut != nullptr) {
     KeyModifierMask activeMask = getActiveModifiers();
     activeMask &= ~KeyModifierAltGr;
+    // Caps Lock is handled locally, and macOS may consume a short tap to switch
+    // input sources. Read the resulting capitalization state from this event.
+    if (isMacCapsLockSyncEnabled()) {
+      activeMask =
+          (activeMask & ~KeyModifierCapsLock) | (mapModifiersFromOSX(CGEventGetFlags(event)) & KeyModifierCapsLock);
+    }
     *maskOut = activeMask;
   }
 
@@ -472,18 +479,22 @@ KeyModifierMask OSXKeyState::pollActiveModifiers() const
 
 int32_t OSXKeyState::pollActiveGroup() const
 {
-  AutoTISInputSourceRef keyboardLayout(nullptr, CFRelease);
-  CFDataRef id = nullptr;
+  AutoTISInputSourceRef inputSource(nullptr, CFRelease);
+  CFStringRef id = nullptr;
   {
     std::lock_guard<std::mutex> lock(g_tisMutex);
-    keyboardLayout = AutoTISInputSourceRef(TISCopyCurrentKeyboardLayoutInputSource(), CFRelease);
-    if (keyboardLayout)
-      id = (CFDataRef)TISGetInputSourceProperty(keyboardLayout.get(), kTISPropertyInputSourceID);
+    // An IME's underlying layout can be a non-selectable source that is absent
+    // from getGroups(). Match the selected source, using its ID's string value.
+    inputSource = AutoTISInputSourceRef(TISCopyCurrentKeyboardInputSource(), CFRelease);
+    if (inputSource)
+      id = (CFStringRef)TISGetInputSourceProperty(inputSource.get(), kTISPropertyInputSourceID);
   }
 
-  GroupMap::const_iterator i = m_groupMap.find(id);
-  if (i != m_groupMap.end()) {
-    return i->second;
+  if (id) {
+    const auto i = m_groupMap.find(id);
+    if (i != m_groupMap.end()) {
+      return i->second;
+    }
   }
 
   LOG_WARN("can't get the active group, use the first group instead");
@@ -514,12 +525,14 @@ void OSXKeyState::getKeyMap(deskflow::KeyMap &keyMap)
     numGroups = CFArrayGetCount(m_groups.get());
     for (int32_t g = 0; g < numGroups; ++g) {
       TISInputSourceRef keyboardLayout = (TISInputSourceRef)CFArrayGetValueAtIndex(m_groups.get(), g);
-      CFDataRef id = nullptr;
+      CFStringRef id = nullptr;
       {
         std::lock_guard<std::mutex> lock(g_tisMutex);
-        id = (CFDataRef)TISGetInputSourceProperty(keyboardLayout, kTISPropertyInputSourceID);
+        id = (CFStringRef)TISGetInputSourceProperty(keyboardLayout, kTISPropertyInputSourceID);
       }
-      m_groupMap[id] = g;
+      if (id) {
+        m_groupMap[id] = g;
+      }
     }
   }
 
@@ -925,6 +938,17 @@ void OSXKeyState::handleModifierKey(void *target, uint32_t virtualKey, KeyID id,
   KeyButton button = mapVirtualKeyToKeyButton(virtualKey);
   onKey(button, down, newMask);
   sendKeyEvent(target, down, false, id, newMask, 0, button);
+}
+
+void OSXKeyState::sendKeyEvent(
+    void *target, bool press, bool isAutoRepeat, KeyID key, KeyModifierMask mask, int32_t count, KeyButton button
+)
+{
+  // Send the resulting Caps Lock state in other keys' modifier masks, rather
+  // than forwarding the physical key that macOS also uses to switch languages.
+  if (!isMacCapsLockSyncEnabled() || key != kKeyCapsLock) {
+    KeyState::sendKeyEvent(target, press, isAutoRepeat, key, mask, count, button);
+  }
 }
 
 bool OSXKeyState::getGroups(AutoCFArray &groups) const

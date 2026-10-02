@@ -1,5 +1,6 @@
 /*
  * Deskflow -- mouse and keyboard sharing utility
+ * SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
  * SPDX-FileCopyrightText: (C) 2025 Deskflow Developers.
  * SPDX-FileCopyrightText: (C) 2012 Synergy App Ltd
  * SPDX-FileCopyrightText: (C) 2002 Chris Schoeneman
@@ -67,6 +68,13 @@ Server::Server(ServerConfig &config, PrimaryClient *primaryClient, deskflow::Com
   }
 
   // install event handlers
+  m_events->addHandler(
+      EventTypes::PrimaryComputerInputStateChanged, m_primaryClient->getEventTarget(),
+      [this](const auto &e) {
+        const auto *info = static_cast<IKeyState::KeyInfo *>(e.getData());
+        synchronizeInputState(info->m_mask);
+      }
+  );
   m_events->addHandler(EventTypes::Timer, this, [this](const auto &) { handleSwitchWaitTimeout(); });
   m_events->addHandler(EventTypes::KeyStateKeyDown, m_inputFilter, [this](const auto &e) { handleKeyDownEvent(e); });
   m_events->addHandler(EventTypes::KeyStateKeyUp, m_inputFilter, [this](const auto &e) { handleKeyUpEvent(e); });
@@ -154,6 +162,7 @@ Server::~Server()
 {
   // remove event handlers and timers
   using enum EventTypes;
+  m_events->removeHandler(PrimaryComputerInputStateChanged, m_primaryClient->getEventTarget());
   m_events->removeHandler(KeyStateKeyDown, m_inputFilter);
   m_events->removeHandler(KeyStateKeyUp, m_inputFilter);
   m_events->removeHandler(KeyStateKeyRepeat, m_inputFilter);
@@ -491,6 +500,7 @@ void Server::switchComputer(BaseClientProxy *dst, int32_t x, int32_t y, bool for
 
     // enter new computer
     m_active->enter(x, y, m_seqNum, m_primaryClient->getToggleMask(), forScreensaver);
+    synchronizeInputState(m_primaryClient->getToggleMask());
 
     if (m_enableClipboard) {
       // send the clipboard data to new active computer
@@ -1221,6 +1231,20 @@ void Server::handleClipboardChanged(const Event &event, BaseClientProxy *client)
   }
   const auto *info = static_cast<const IComputer::ClipboardInfo *>(event.getData());
   onClipboardChanged(client, info->m_id, info->m_sequenceNumber);
+}
+
+void Server::synchronizeInputState(KeyModifierMask mask)
+{
+  const auto *options = m_config->getOptions("");
+  if (m_active == m_primaryClient || options == nullptr) {
+    return;
+  }
+  const auto option = options->find(kOptionMacCapsLockSync);
+  if (option == options->end() || option->second == 0) {
+    return;
+  }
+  const auto lang = AppUtil::instance().getCurrentLanguageCode();
+  m_active->synchronizeInputState(mask, lang);
 }
 
 void Server::handleKeyDownEvent(const Event &event)

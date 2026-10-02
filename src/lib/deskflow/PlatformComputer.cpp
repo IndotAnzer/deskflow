@@ -58,6 +58,11 @@ bool PlatformComputer::fakeCtrlAltDel()
   return getKeyState()->fakeCtrlAltDel();
 }
 
+void PlatformComputer::synchronizeInputState(KeyModifierMask mask, const std::string &lang)
+{
+  getKeyState()->synchronizeInputState(mask, lang);
+}
+
 bool PlatformComputer::isKeyDown(KeyButton button) const
 {
   return getKeyState()->isKeyDown(button);
