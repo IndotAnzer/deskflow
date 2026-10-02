@@ -1,6 +1,6 @@
 /*
  * Deskflow -- mouse and keyboard sharing utility
- * SPDX-FileCopyrightText: (C) 2025 Deskflow Developers
+ * SPDX-FileCopyrightText: (C) 2025 - 2026 Deskflow Developers
  * SPDX-FileCopyrightText: (C) 2012 - 2016 Synergy App Ltd
  * SPDX-FileCopyrightText: (C) 2003 Chris Schoeneman
  * SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
@@ -74,6 +74,11 @@ public:
   doesn't report a key press when toggled off.
   */
   virtual void setHalfDuplexMask(KeyModifierMask) = 0;
+
+  //! Apply source input state without an input character.
+  virtual void synchronizeInputState(KeyModifierMask, const std::string &)
+  {
+  }
 
   //! Fake a key press
   /*!

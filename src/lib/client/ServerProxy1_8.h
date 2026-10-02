@@ -1,5 +1,6 @@
 /*
  * Deskflow -- mouse and keyboard sharing utility
+ * SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
  * SPDX-FileCopyrightText: (C) 2026 Synergy App Ltd
  * SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
  */
@@ -20,12 +21,12 @@ public:
   ~ServerProxy1_8() override = default;
 
 protected:
+  void setActiveServerLayout(const std::string_view &layout);
   ConnectionResult parseHandshakeMessage(const uint8_t *code) override;
   ConnectionResult parseMessage(const uint8_t *code) override;
 
 private:
   void setServerLayouts();
-  void setActiveServerLayout(const std::string_view &layout);
 
   std::string m_serverLayout;
   bool m_isUserNotifiedAboutLayoutSyncError = false;

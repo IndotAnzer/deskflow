@@ -1,6 +1,6 @@
 /*
  * Deskflow -- mouse and keyboard sharing utility
- * SPDX-FileCopyrightText: (C) 2025 Deskflow Developers
+ * SPDX-FileCopyrightText: (C) 2025 - 2026 Deskflow Developers
  * SPDX-FileCopyrightText: (C) 2012 Synergy App Ltd
  * SPDX-FileCopyrightText: (C) 2002 Chris Schoeneman
  * SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
@@ -307,6 +307,7 @@ private:
   void handleShapeChanged(BaseClientProxy *client);
   void handleClipboardGrabbed(const Event &event, BaseClientProxy *client);
   void handleClipboardChanged(const Event &event, BaseClientProxy *client);
+  void synchronizeInputState(KeyModifierMask mask);
   void handleKeyDownEvent(const Event &event);
   void handleKeyUpEvent(const Event &event);
   void handleKeyRepeatEvent(const Event &event);

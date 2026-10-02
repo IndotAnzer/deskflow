@@ -733,8 +733,19 @@ void OSXComputer::enable()
       m_eventTapThread = std::thread([this, sem]() {
         m_eventTapRunLoop = CFRunLoopGetCurrent();
         CFRunLoopAddSource(m_eventTapRunLoop, m_eventTapRLSR, kCFRunLoopDefaultMode);
+        if (m_isPrimary) {
+          CFNotificationCenterAddObserver(
+              CFNotificationCenterGetDistributedCenter(), this, inputSourceChanged,
+              kTISNotifySelectedKeyboardInputSourceChanged, nullptr, CFNotificationSuspensionBehaviorDeliverImmediately
+          );
+        }
         dispatch_semaphore_signal(sem);
         CFRunLoopRun();
+        if (m_isPrimary) {
+          CFNotificationCenterRemoveObserver(
+              CFNotificationCenterGetDistributedCenter(), this, kTISNotifySelectedKeyboardInputSourceChanged, nullptr
+          );
+        }
         CFRunLoopRemoveSource(CFRunLoopGetCurrent(), m_eventTapRLSR, kCFRunLoopDefaultMode);
         m_eventTapRunLoop = nullptr;
       });
@@ -880,12 +891,16 @@ void OSXComputer::screensaver(bool activate)
 
 void OSXComputer::resetOptions()
 {
-  // no options
+  m_keyState->setMacCapsLockSync(false);
 }
 
-void OSXComputer::setOptions(const OptionsList &)
+void OSXComputer::setOptions(const OptionsList &options)
 {
-  // no options
+  for (size_t i = 0; i + 1 < options.size(); i += 2) {
+    if (options[i] == kOptionMacCapsLockSync) {
+      m_keyState->setMacCapsLockSync(m_isPrimary && options[i + 1] != 0);
+    }
+  }
 }
 
 void OSXComputer::setSequenceNumber(uint32_t seqNum)
@@ -1076,6 +1091,23 @@ void OSXComputer::displayReconfigurationCallback(
     if (!computer->updateComputerShape(displayID, flags)) {
       LOG_ERR("failed to update computer shape during display reconfiguration");
     }
+  }
+}
+
+void OSXComputer::inputSourceChanged(
+    CFNotificationCenterRef, void *observer, CFStringRef, const void *, CFDictionaryRef
+)
+{
+  static_cast<OSXComputer *>(observer)->sendInputStateChanged();
+}
+
+void OSXComputer::sendInputStateChanged() const
+{
+  if (m_isPrimary && m_keyState->isMacCapsLockSyncEnabled()) {
+    const auto mask = m_keyState->mapModifiersFromOSX(CGEventSourceFlagsState(kCGEventSourceStateHIDSystemState));
+    m_events->addEvent(Event(
+        EventTypes::PrimaryComputerInputStateChanged, getEventTarget(), IKeyState::KeyInfo::alloc(kKeyNone, mask, 0, 0)
+    ));
   }
 }
 
@@ -1709,6 +1741,13 @@ CGEventRef OSXComputer::handleCGInputEvent(CGEventTapProxy proxy, CGEventType ty
   case kCGEventKeyUp:
   case kCGEventFlagsChanged:
     computer->onKey(event);
+    // Let macOS handle Caps Lock's native input-source switch even while the
+    // pointer is on a secondary computer. Its physical key is not forwarded;
+    // subsequent keys carry the resulting language and capitalization state.
+    if (computer->m_keyState->isMacCapsLockSyncEnabled() &&
+        CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode) == kVK_CapsLock) {
+      return event;
+    }
     break;
   case kCGEventTapDisabledByTimeout:
     // Re-enable our event-tap if we still have accessibility permissions

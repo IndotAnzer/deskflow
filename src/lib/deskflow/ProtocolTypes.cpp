@@ -1,5 +1,6 @@
 /*
  * Deskflow -- mouse and keyboard sharing utility
+ * SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
  * SPDX-FileCopyrightText: (C) 2012 - 2016 Synergy App Ltd
  * SPDX-FileCopyrightText: (C) 2002 Chris Schoeneman
  * SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
@@ -48,6 +49,7 @@ const char *const kMsgDFileTransfer = "DFTR%1i%s";
 const char *const kMsgDDragInfo = "DDRG%2i%s";
 const char *const kMsgDSecureInputNotification = "SECN%s";
 const char *const kMsgDLanguageSynchronisation = "LSYN%s";
+const char *const kMsgDInputState = "DISS%2i%s";
 const char *const kMsgQInfo = "QINF";
 const char *const kMsgEIncompatible = "EICV%2i%2i";
 const char *const kMsgEBusy = "EBSY";

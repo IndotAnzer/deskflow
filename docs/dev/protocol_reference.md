@@ -180,6 +180,7 @@ This table lists all protocol messages in alphabetical order. For a typical sequ
 | [**HelloBack**](@ref kMsgHelloBack) | @ref kMsgHelloBack | Handshake | Client→Server | Client identification | [HelloSize](#constraint-max-hello), [MsgSize](#constraint-protocol-max-message-length), [HandshakeTimeout](#constraint-handshake-timeout) | 1.0+ |
 | [**HelloBackArgs**](@ref kMsgHelloBackArgs) | @ref kMsgHelloBackArgs | Handshake | Internal | HelloBack message construction | [HelloSize](#constraint-max-hello), [MsgSize](#constraint-protocol-max-message-length), [HandshakeTimeout](#constraint-handshake-timeout) | 1.0+ |
 | [**LSYN**](@ref kMsgDLanguageSynchronisation) | @ref kMsgDLanguageSynchronisation | Data | Server→Client | Language synchronization | [MsgSize](#constraint-protocol-max-message-length) | 1.8+ |
+| [**DISS**](@ref kMsgDInputState) | @ref kMsgDInputState | Data | Server→Client | Input language and modifier state without a key event | [MsgSize](#constraint-protocol-max-message-length) | 1.9+ |
 | [**QINF**](@ref kMsgQInfo) | @ref kMsgQInfo | Query | Server→Client | Request computer info | [MsgSize](#constraint-protocol-max-message-length) | 1.0+ |
 | [**SECN**](@ref kMsgDSecureInputNotification) | @ref kMsgDSecureInputNotification | Data | Server→Client | Secure input notification | [MsgSize](#constraint-protocol-max-message-length) | 1.7+ |
 
@@ -292,6 +293,7 @@ A modifier (modifier mask) represents the state of modifier keys (like Shift, Co
 | **1.6** | Jan 2014 | Synergy | Clipboard streaming | 1.6+ |
 | **1.7** | Sep 2021 | Synergy | Secure input notifications | 1.7+ |
 | **1.8** | Nov 2021 | Synergy | Language synchronization | 1.8+ |
+| **1.9** | Unreleased | Deskflow | Optional input-state notification (`DISS`); key formats unchanged from 1.8 | Negotiates older proxies for 1.8 and earlier |
 
 ### Version Migration Guide
 
@@ -532,3 +534,18 @@ When extending the protocol:
 ---
 
 *This documentation is generated from the source code and is always up-to-date with the latest protocol implementation.*
+
+### Optional Mac-to-Windows input state synchronization
+
+When enabled on a Mac primary, Caps Lock is handled locally rather than forwarded
+as a physical key. Input-source changes and client entry send `DISS` to the active
+protocol 1.9 secondary. Windows applies Caps Lock state and, when keyboard language
+synchronization is enabled, Chinese/English mode through the focused Chinese IME's
+IMM compatibility interface. Other IMEs and languages are not covered by this mode.
+
+The server option applies to every secondary: use it with updated Windows
+secondaries. Linux and Mac secondaries do not implement this state application,
+and their physical Caps Lock events are suppressed while the option is enabled.
+Older Windows clients do not receive `DISS` and may update only on the next key
+if they support synchronization before typing. Leave the option disabled for a
+mixed-platform setup or when physical Caps Lock forwarding is required.

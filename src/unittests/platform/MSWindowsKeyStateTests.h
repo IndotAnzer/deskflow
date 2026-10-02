@@ -5,22 +5,21 @@
  */
 
 #pragma once
-
+#include "arch/Arch.h"
 #include "base/Log.h"
-
 #include <QObject>
 
-class ServerProxyTests : public QObject
+class MSWindowsKeyStateTests : public QObject
 {
   Q_OBJECT
-
 private Q_SLOTS:
   void initTestCase();
-  void parseInputState_withoutKeyEvent();
-  void handleKeepAliveAlarm_timeout_queuesDisconnectRequest();
-  void handleData_incompleteMessage_queuesDisconnectRequest();
-  void parseHandshakeMessage_protocolError_queuesRefusalRequest();
+  void repeatedKeys_skipImeMessages();
+  void changedContext_resynchronizes();
+  void failedAttempt_isNotRetriedForEveryKey();
+  void inputStateAndOptionChanges_invalidateCache();
 
 private:
+  Arch m_arch;
   Log m_log;
 };

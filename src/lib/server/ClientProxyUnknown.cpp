@@ -1,6 +1,6 @@
 /*
  * Deskflow -- mouse and keyboard sharing utility
- * SPDX-FileCopyrightText: (C) 2025 Deskflow Developers
+ * SPDX-FileCopyrightText: (C) 2025 - 2026 Deskflow Developers
  * SPDX-FileCopyrightText: (C) 2012 - 2016 Synergy App Ltd
  * SPDX-FileCopyrightText: (C) 2004 Chris Schoeneman
  * SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
@@ -23,6 +23,7 @@
 #include "server/ClientProxy1_6.h"
 #include "server/ClientProxy1_7.h"
 #include "server/ClientProxy1_8.h"
+#include "server/ClientProxy1_9.h"
 #include "server/Server.h"
 
 //
@@ -175,6 +176,10 @@ void ClientProxyUnknown::initProxy(const std::string &name, int major, int minor
 
     case 8:
       m_proxy = new ClientProxy1_8(name, m_stream, m_server, m_events);
+      break;
+
+    case 9:
+      m_proxy = new ClientProxy1_9(name, m_stream, m_server, m_events);
       break;
 
     default:

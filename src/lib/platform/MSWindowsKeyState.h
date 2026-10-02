@@ -1,5 +1,6 @@
 /*
  * Deskflow -- mouse and keyboard sharing utility
+ * SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
  * SPDX-FileCopyrightText: (C) 2012 - 2016 Synergy App Ltd
  * SPDX-FileCopyrightText: (C) 2003 Chris Schoeneman
  * SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
@@ -133,6 +134,8 @@ public:
   // IKeyState overrides
   void fakeKeyDown(KeyID id, KeyModifierMask mask, KeyButton button, const std::string &lang) override;
   bool fakeKeyRepeat(KeyID id, KeyModifierMask mask, int32_t count, KeyButton button, const std::string &lang) override;
+  void setMacCapsLockSync(bool enabled) override;
+  void synchronizeInputState(KeyModifierMask mask, const std::string &lang) override;
   bool fakeCtrlAltDel() override;
   KeyModifierMask pollActiveModifiers() const override;
   int32_t pollActiveGroup() const override;
@@ -166,6 +169,11 @@ protected:
   // KeyState overrides
   void getKeyMap(deskflow::KeyMap &keyMap) override;
   void fakeKey(const Keystroke &keystroke) override;
+  void synchronizeInputMethod(const std::string &lang) override;
+  //! Resolve the focused Chinese IME context without sending cross-thread messages.
+  virtual bool queryInputMethodTarget(HWND &foreground, HWND &focus, HKL &layout) const;
+  virtual HWND getInputMethodWindow(HWND focus) const;
+  virtual bool controlInputMethod(HWND window, WPARAM command, LPARAM value, DWORD_PTR &result) const;
   KeyModifierMask &getActiveModifiersRValue() override;
 
 private:
@@ -192,6 +200,10 @@ private:
   void *m_eventTarget;
   MSWindowsDesks *m_desks;
   HKL m_keyLayout;
+  HWND m_lastImeForeground = nullptr;
+  HWND m_lastImeFocus = nullptr;
+  HKL m_lastImeLayout = nullptr;
+  std::string m_lastImeLanguage;
   UINT m_buttonToVK[512];
   UINT m_buttonToNumpadVK[512];
   KeyButton m_virtualKeyToButton[256];

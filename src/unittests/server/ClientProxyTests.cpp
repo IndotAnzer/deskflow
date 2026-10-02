@@ -1,5 +1,6 @@
 /*
  * Deskflow -- mouse and keyboard sharing utility
+ * SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
  * SPDX-FileCopyrightText: (C) 2026 Synergy App Ltd
  * SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
  */
@@ -14,6 +15,7 @@
 #include "server/ClientProxy1_6.h"
 #include "server/ClientProxy1_7.h"
 #include "server/ClientProxy1_8.h"
+#include "server/ClientProxy1_9.h"
 
 #include <memory>
 #include <string>
@@ -120,6 +122,9 @@ std::unique_ptr<ClientProxy> makeProxy(int minor, deskflow::IStream *stream, IEv
   case 8:
     proxy = std::make_unique<ClientProxy1_8>("client", stream, server, events);
     break;
+  case 9:
+    proxy = std::make_unique<ClientProxy1_9>("client", stream, server, events);
+    break;
   default:
     break;
   }
@@ -220,6 +225,22 @@ void ClientProxyTests::keyUp()
   ProxyUnderTest test(minor);
   test.proxy->keyUp(kKey, kMask, kButton);
   QCOMPARE(test.stream->take(), expected);
+}
+
+void ClientProxyTests::synchronizeInputState_newProtocolWritesStateOnly()
+{
+  ProxyUnderTest test(9);
+  test.proxy->synchronizeInputState(KeyModifierCapsLock, "zh");
+  QCOMPARE(test.stream->take(), "DISS" + QByteArray::fromHex("1000 00000002") + "zh");
+}
+
+void ClientProxyTests::synchronizeInputState_legacyProtocolsIgnoreState()
+{
+  for (const auto version : {0, 1, 6, 7, 8}) {
+    ProxyUnderTest test(version);
+    test.proxy->synchronizeInputState(KeyModifierCapsLock, "zh");
+    QVERIFY(test.stream->take().isEmpty());
+  }
 }
 
 QTEST_MAIN(ClientProxyTests)

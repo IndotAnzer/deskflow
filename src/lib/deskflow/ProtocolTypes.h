@@ -1,5 +1,6 @@
 /*
  * Deskflow -- mouse and keyboard sharing utility
+ * SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
  * SPDX-FileCopyrightText: (C) 2012 - 2016 Synergy App Ltd
  * SPDX-FileCopyrightText: (C) 2002 Chris Schoeneman
  * SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
@@ -45,7 +46,7 @@ static const int16_t kProtocolMajorVersion = 1;
  * @note When incrementing the minor version, the Deskflow application version should also increment
  * @since Protocol version 1.0
  */
-static const int16_t kProtocolMinorVersion = 8;
+static const int16_t kProtocolMinorVersion = 9;
 
 /**
  * @brief Default TCP port for Deskflow connections
@@ -1161,6 +1162,32 @@ extern const char *const kMsgDSecureInputNotification;
  * @since Protocol version 1.8
  */
 extern const char *const kMsgDLanguageSynchronisation;
+
+/**
+ * @brief Input state synchronization without a key event
+ *
+ * **Message Code**: `"DISS"`
+ * **Direction**: Primary → Secondary
+ * **Format**: `"DISS%2i%s"`
+ * **Parameters**:
+ * - `$1`: Modifier mask (uint16) - Includes the current Caps Lock state
+ * - `$2`: Language (string) - ISO 639-1 language code, or empty if unavailable
+ *
+ * **Example**:
+ *
+ * Chinese input with Caps Lock disabled:
+ * ```
+ * "DISS\x00\x00\x00\x00\x00\x02zh"
+ * ```
+ *
+ * Updates the active secondary's input state without synthesizing a character.
+ * Sent on primary input-source changes and on entry to the secondary. Applying
+ * the state requires the opt-in Mac input-state option; IME mode also requires
+ * keyboard language synchronization. Older negotiated protocols omit this message.
+ *
+ * @since Protocol version 1.9
+ */
+extern const char *const kMsgDInputState;
 
 /** @} */ // end of protocol_system group
 

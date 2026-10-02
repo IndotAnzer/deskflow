@@ -177,6 +177,7 @@ public:
   void setClipboard(ClipboardID, const IClipboard *) override;
   void grabClipboard(ClipboardID) override;
   void setClipboardDirty(ClipboardID, bool) override;
+  void synchronizeInputState(KeyModifierMask mask, const std::string &lang) override;
   void keyDown(KeyID, KeyModifierMask, KeyButton, const std::string &) override;
   void keyRepeat(KeyID, KeyModifierMask, int32_t count, KeyButton, const std::string &lang) override;
   void keyUp(KeyID, KeyModifierMask, KeyButton) override;

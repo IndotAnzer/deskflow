@@ -10,6 +10,7 @@
 #include "base/IEventQueue.h"
 #include "client/Client.h"
 #include "client/ServerProxy.h"
+#include "client/ServerProxy1_9.h"
 #include "deskflow/AppUtil.h"
 #include "deskflow/ProtocolTypes.h"
 #include "io/IStream.h"
@@ -246,6 +247,25 @@ public:
   }
 };
 
+class InputStateServerProxy : public ServerProxy1_9
+{
+public:
+  using ServerProxy1_9::ServerProxy1_9;
+  bool parseState(const uint8_t *code)
+  {
+    return parseMessage(code) == ConnectionResult::Okay;
+  }
+  void synchronizeInputState(uint16_t mask, const std::string &lang) override
+  {
+    receivedMask = mask;
+    receivedLanguage = lang;
+    ++count;
+  }
+  uint16_t receivedMask = 0;
+  std::string receivedLanguage;
+  int count = 0;
+};
+
 Client *undereferenceableClient()
 {
   // These paths must queue cleanup without calling through to Client.
@@ -326,6 +346,19 @@ void ServerProxyTests::parseHandshakeMessage_protocolError_queuesRefusalRequest(
   QVERIFY(request->kind() == Client::DisconnectRequest::Kind::Refuse);
   QVERIFY(request->refusalReason() == deskflow::core::ConnectionRefusal::ProtocolError);
   QCOMPARE(QString::fromUtf8(request->message()), QStringLiteral("server reported a protocol error"));
+}
+
+void ServerProxyTests::parseInputState_withoutKeyEvent()
+{
+  RecordingEventQueue events;
+  FakeStream stream;
+  stream.push(std::string("\x10\x00\x00\x00\x00\x02zh", 8));
+  InputStateServerProxy proxy(undereferenceableClient(), &stream, &events);
+  QVERIFY(proxy.parseState(reinterpret_cast<const uint8_t *>(kMsgDInputState)));
+  QCOMPARE(proxy.count, 1);
+  QCOMPARE(proxy.receivedMask, uint16_t(KeyModifierCapsLock));
+  QCOMPARE(proxy.receivedLanguage, std::string("zh"));
+  QVERIFY(events.addedEvents().empty());
 }
 
 QTEST_MAIN(ServerProxyTests)
