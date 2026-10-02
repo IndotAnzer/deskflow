@@ -1,0 +1,80 @@
+# SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
+# SPDX-License-Identifier: MIT
+name: Mac IME regression tests
+on:
+  push:
+    branches: ['build/ime-review-mac-ime']
+permissions:
+  contents: read
+jobs:
+  mac-ime:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/install-dependencies
+        with:
+          qt-version: 6.11.3
+      - name: Enable system Chinese and Japanese IMEs on the temporary runner
+        run: |
+          python3 - <<'PY'
+          import ctypes as C
+          cf = C.CDLL('/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation')
+          tis = C.CDLL('/System/Library/Frameworks/Carbon.framework/Frameworks/HIToolbox.framework/HIToolbox')
+          tis.TISCreateInputSourceList.argtypes = [C.c_void_p, C.c_bool]
+          tis.TISCreateInputSourceList.restype = C.c_void_p
+          tis.TISGetInputSourceProperty.argtypes = [C.c_void_p, C.c_void_p]
+          tis.TISGetInputSourceProperty.restype = C.c_void_p
+          tis.TISEnableInputSource.argtypes = [C.c_void_p]
+          tis.TISEnableInputSource.restype = C.c_int32
+          cf.CFArrayGetCount.argtypes = [C.c_void_p]
+          cf.CFArrayGetCount.restype = C.c_long
+          cf.CFArrayGetValueAtIndex.argtypes = [C.c_void_p, C.c_long]
+          cf.CFArrayGetValueAtIndex.restype = C.c_void_p
+          cf.CFStringGetCString.argtypes = [C.c_void_p, C.c_char_p, C.c_long, C.c_uint32]
+          cf.CFStringGetCString.restype = C.c_bool
+          cf.CFRelease.argtypes = [C.c_void_p]
+          languages_key = C.c_void_p.in_dll(tis, 'kTISPropertyInputSourceLanguages').value
+          id_key = C.c_void_p.in_dll(tis, 'kTISPropertyInputSourceID').value
+          layout_key = C.c_void_p.in_dll(tis, 'kTISPropertyUnicodeKeyLayoutData').value
+          def string(ref):
+              buffer = C.create_string_buffer(1024)
+              assert cf.CFStringGetCString(ref, buffer, len(buffer), 0x08000100)
+              return buffer.value.decode()
+          sources = tis.TISCreateInputSourceList(None, True)
+          enabled = set()
+          for i in range(cf.CFArrayGetCount(sources)):
+              source = cf.CFArrayGetValueAtIndex(sources, i)
+              if tis.TISGetInputSourceProperty(source, layout_key):
+                  continue
+              languages = tis.TISGetInputSourceProperty(source, languages_key)
+              if not languages:
+                  continue
+              codes = {string(cf.CFArrayGetValueAtIndex(languages, j))[:2]
+                       for j in range(cf.CFArrayGetCount(languages))}
+              if codes & {'zh', 'ja'} and tis.TISEnableInputSource(source) == 0:
+                  enabled |= codes & {'zh', 'ja'}
+                  print('Enabled:', string(tis.TISGetInputSourceProperty(source, id_key)))
+          cf.CFRelease(sources)
+          assert enabled == {'zh', 'ja'}, enabled
+          PY
+      - name: Configure and build
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_INSTALLER=OFF -DSKIP_BUILD_TESTS=ON -DCMAKE_COMPILE_WARNING_AS_ERROR=ON -DCMAKE_OSX_ARCHITECTURES=arm64
+          cmake --build build --parallel 8
+      - name: Run Mac input method regressions
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          ctest --test-dir build/src/unittests -R '^OSXKeyStateTests$' -V --output-on-failure
+          python3 - <<'PY'
+          from pathlib import Path
+          log = Path('build/src/unittests/Testing/Temporary/LastTest.log').read_text()
+          assert 'PASS   : OSXKeyStateTests::imeClient_usesCharacterLayout(Chinese IME)' in log
+          assert 'PASS   : OSXKeyStateTests::imeClient_usesCharacterLayout(Japanese IME)' in log
+          PY
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: mac-ime-regression-log
+          path: build/src/unittests/Testing/Temporary/LastTest.log

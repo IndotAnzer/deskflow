@@ -18,6 +18,25 @@ if (OSX_BUNDLE)
     \"\${CMAKE_INSTALL_PREFIX}/${CMAKE_PROJECT_PROPER_NAME}.app\"
     -hardened-runtime -timestamp \"-codesign=${_codesign_identity}\"
   )")
+  if (_codesign_identity STREQUAL "-")
+    # Qt frameworks may keep their original Qt team signature. Ad-hoc test
+    # bundles cannot satisfy hardened-runtime library validation against it.
+    # Re-sign the entire bundle consistently, without hardened runtime.
+    install(CODE "
+      execute_process(COMMAND codesign --force --deep --sign - --options 0 --timestamp=none
+        \"\${CMAKE_INSTALL_PREFIX}/${CMAKE_PROJECT_PROPER_NAME}.app\"
+        RESULT_VARIABLE _sign_result)
+      if (NOT _sign_result EQUAL 0)
+        message(FATAL_ERROR \"Ad-hoc bundle signing failed: \${_sign_result}\")
+      endif()
+      execute_process(COMMAND codesign --verify --deep --strict
+        \"\${CMAKE_INSTALL_PREFIX}/${CMAKE_PROJECT_PROPER_NAME}.app\"
+        RESULT_VARIABLE _verify_result)
+      if (NOT _verify_result EQUAL 0)
+        message(FATAL_ERROR \"Ad-hoc bundle signature verification failed: \${_verify_result}\")
+      endif()
+    ")
+  endif()
   set(CPACK_PACKAGE_ICON "${MY_DIR}/dmg-volume.icns")
   set(CPACK_DMG_BACKGROUND_IMAGE "${MY_DIR}/dmg-background.tiff")
   set(CPACK_DMG_DS_STORE_SETUP_SCRIPT "${MY_DIR}/generate_ds_store.applescript")
