@@ -368,6 +368,16 @@
            </widget>
           </item>
           <item>
+           <widget class="QCheckBox" name="cbMacCapsLockSync">
+            <property name="text">
+             <string>Handle Caps Lock on Mac and sync input state</string>
+            </property>
+            <property name="toolTip">
+             <string>Let Mac handle Caps Lock locally and synchronize capitalization with Windows before typing. Enable keyboard language synchronization on Windows to also synchronize Chinese/English input mode.</string>
+            </property>
+           </widget>
+          </item>
+          <item>
            <widget class="QCheckBox" name="cbWin32KeepForeground">
             <property name="enabled">
              <bool>true</bool>

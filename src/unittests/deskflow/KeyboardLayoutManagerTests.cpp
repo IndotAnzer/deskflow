@@ -76,4 +76,26 @@ void KeyboardLayoutManagerTests::serializeLocalLayouts()
   QCOMPARE(manager.getSerializedLocalLayouts(), "ruenuk");
 }
 
+void KeyboardLayoutManagerTests::normalizeLanguageCode_data()
+{
+  QTest::addColumn<QString>("language");
+  QTest::addColumn<QString>("expected");
+  QTest::newRow("simplified Chinese") << "zh-Hans" << "zh";
+  QTest::newRow("traditional Chinese") << "zh-Hant" << "zh";
+  QTest::newRow("English region") << "en-US" << "en";
+  QTest::newRow("underscore region") << "zh_CN" << "zh";
+  QTest::newRow("uppercase") << "EN" << "en";
+  QTest::newRow("plain language") << "ja" << "ja";
+  QTest::newRow("empty") << "" << "";
+  QTest::newRow("unsupported language length") << "eng" << "";
+  QTest::newRow("invalid") << "z1-Hans" << "";
+}
+
+void KeyboardLayoutManagerTests::normalizeLanguageCode()
+{
+  QFETCH(QString, language);
+  QFETCH(QString, expected);
+  QCOMPARE(deskflow::KeyboardLayoutManager::normalizeLanguageCode(language.toStdString()), expected.toStdString());
+}
+
 QTEST_MAIN(KeyboardLayoutManagerTests)

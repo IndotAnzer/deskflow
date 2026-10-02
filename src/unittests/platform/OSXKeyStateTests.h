@@ -20,6 +20,9 @@ private Q_SLOTS:
   void fakePollShift();
   void fakePollChar();
   void fakePollCharWithModifier();
+  void capsLock_updatesStateWithoutForwardingKey();
+  void mapKeyFromEvent_usesActualCapsLockState();
+  void capsLock_disabledForwardsKey();
 
 private:
   bool isKeyPressed(const OSXKeyState &keyState, KeyButton button);

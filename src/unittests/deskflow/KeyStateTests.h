@@ -31,6 +31,14 @@ private Q_SLOTS:
   void updateKeyState_pollInsertsSingleKey_keyIsDown();
   void fakeKeyDown_langSyncEnabled_switchesToServerGroup();
   void fakeKeyDown_langSyncDisabled_keepsLocalGroup();
+  void fakeKeyDown_syncsInputMethodAfterGroupBeforeButton();
+  void fakeKeyRepeat_syncsInputMethod();
+  void fakeKeyDown_inputMethodSyncDisabled();
+  void fakeKeyDown_emptyLanguageDoesNotSyncInputMethod();
+  void synchronizeCapsLock_setsAndClearsState();
+  void synchronizeCapsLock_matchingStateDoesNotToggle();
+  void synchronizeCapsLock_preservesOtherModifiers();
+  void synchronizeCapsLock_disabledLeavesStateAlone();
 
 private:
   Arch m_arch;
