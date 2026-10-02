@@ -1,0 +1,93 @@
+# SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
+# SPDX-License-Identifier: MIT
+
+name: Mac IME test installer with consistent signatures
+on:
+  push:
+    branches: [build/ime-macos-signing-fix]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: mac-ime-signing-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Install dependencies
+        uses: ./.github/actions/install-dependencies
+        with:
+          qt-version: 6.11.3
+      - name: Configure
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_INSTALLER=ON \
+            -DSKIP_BUILD_TESTS=ON -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14 \
+            -DPACKAGE_VERSION_LABEL="ime-signfix-${GITHUB_SHA:0:8}"
+      - name: Build DMG
+        run: |
+          cmake --build build --config Release --parallel 8
+          for attempt in 1 2 3 4 5; do
+            if cmake --build build --config Release --parallel 8 --target package; then
+              test -n "$(find build -maxdepth 1 -name '*.dmg' -print -quit)"
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+      - name: Validate signatures and start packaged GUI
+        run: |
+          dmg=$(find build -maxdepth 1 -name '*.dmg' -print -quit)
+          echo Y | hdiutil attach "$dmg" -nobrowse -mountpoint /tmp/deskflow-signfix-dmg
+          trap 'hdiutil detach /tmp/deskflow-signfix-dmg' EXIT
+          ditto /tmp/deskflow-signfix-dmg/Deskflow.app /tmp/Deskflow-signfix.app
+          app=/tmp/Deskflow-signfix.app
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dv --verbose=4 "$app" 2>build/GUI-SIGNATURE.txt
+          codesign -dv --verbose=4 "$app/Contents/Frameworks/QtWidgets.framework" 2>build/QTWIDGETS-SIGNATURE.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          gui = Path('build/GUI-SIGNATURE.txt').read_text()
+          qt = Path('build/QTWIDGETS-SIGNATURE.txt').read_text()
+          print(gui, qt)
+          assert 'TeamIdentifier=not set' in gui
+          assert 'TeamIdentifier=not set' in qt
+          assert not any('runtime' in line for line in gui.splitlines() if line.startswith('CodeDirectory '))
+          PY
+          env -u QT_PLUGIN_PATH -u QT_ROOT_DIR -u QML2_IMPORT_PATH \
+            -u DYLD_LIBRARY_PATH -u DYLD_FRAMEWORK_PATH -u DYLD_FALLBACK_LIBRARY_PATH \
+            "$app/Contents/MacOS/Deskflow" --version >build/GUI-STARTUP.txt 2>&1
+          cat build/GUI-STARTUP.txt
+          env -u QT_PLUGIN_PATH -u QT_ROOT_DIR -u QML2_IMPORT_PATH \
+            -u DYLD_LIBRARY_PATH -u DYLD_FRAMEWORK_PATH -u DYLD_FALLBACK_LIBRARY_PATH \
+            "$app/Contents/MacOS/deskflow-core" --version
+      - name: Native unit tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build/src/unittests --output-on-failure
+      - name: Build information and checksums
+        run: |
+          echo "Source commit: $GITHUB_SHA" >build/BUILD-INFO.txt
+          echo "ARM64 test DMG. Consistent ad-hoc signatures; no Apple notarization." >>build/BUILD-INFO.txt
+          echo "Packaged GUI/core startup, deep signature validation and native unit tests passed." >>build/BUILD-INFO.txt
+          (cd build && shasum -a 256 *.dmg >SHA256SUMS.txt)
+      - name: Upload verified DMG
+        uses: actions/upload-artifact@v7
+        with:
+          name: deskflow-ime-signfix-macos-arm64
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            build/*.dmg
+            build/BUILD-INFO.txt
+            build/SHA256SUMS.txt
+            build/GUI-SIGNATURE.txt
+            build/QTWIDGETS-SIGNATURE.txt
+            build/GUI-STARTUP.txt
+            build/src/unittests/Testing/Temporary/LastTest.log
