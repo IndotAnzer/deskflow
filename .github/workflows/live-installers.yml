@@ -1,0 +1,79 @@
+# SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
+# SPDX-License-Identifier: MIT
+
+name: Keyboard language fixes native tests
+
+on:
+  push:
+    branches:
+      - 'build/ime-fixes'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: ime-test-installers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: ${{ matrix.target.name }}
+    runs-on: ${{ matrix.target.runner }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - name: windows-x64
+            runner: windows-2022
+            os: windows
+            arch: amd64
+            qt-version: 6.11.3
+            vcpkg-triplet: x64-windows-release
+            config-args: -G Ninja
+          - name: macos-arm64
+            runner: macos-15
+            os: macos
+            qt-version: 6.11.3
+            config-args: -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14
+    steps:
+      - name: Checkout test source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup VC++
+        if: runner.os == 'Windows'
+        uses: TheMrMilchmann/setup-msvc-dev@v4
+        with:
+          arch: ${{ matrix.target.arch }}
+          spectre: true
+
+      - name: Install dependencies
+        id: deps
+        uses: ./.github/actions/install-dependencies
+        with:
+          qt-version: ${{ matrix.target.qt-version }}
+          vcpkg-triplet: ${{ matrix.target.vcpkg-triplet }}
+
+      - name: Configure
+        shell: bash
+        run: |
+          cmake_args=()
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            cmake_args+=("-DCMAKE_TOOLCHAIN_FILE=$(pwd -W)/vcpkg/scripts/buildsystems/vcpkg.cmake")
+            cmake_args+=("-DVCPKG_TARGET_TRIPLET=${{ matrix.target.vcpkg-triplet }}" "-DVCPKG_MANIFEST_MODE=OFF")
+          fi
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_INSTALLER=OFF \
+            -DSKIP_BUILD_TESTS=ON -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
+            -DPACKAGE_VERSION_LABEL="ime-live-${GITHUB_SHA:0:8}" \
+            ${{ matrix.target.config-args }} "${cmake_args[@]}"
+
+      - name: Build
+        run: cmake --build build --config Release --parallel 8
+      - name: Native unit tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build/src/unittests --output-on-failure
