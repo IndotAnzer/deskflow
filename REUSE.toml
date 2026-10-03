@@ -1,3 +1,4 @@
+# SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
 # SPDX-FileCopyrightText: 2025 Chris Rizzitello <sithlord48@gmail.com>
 # SPDX-License-Identifier: MIT
 
@@ -29,7 +30,7 @@ path = [
  , "src/apps/res/entitlements-dev.plist"
  , "translations/*.ts"
 ]
-SPDX-FileCopyrightText = "Deskflow Developers"
+SPDX-FileCopyrightText = "(C) 2025 - 2026 Deskflow Developers"
 SPDX-License-Identifier = "MIT"
 
 [[annotations]]
@@ -63,5 +64,5 @@ path = [
    "src/lib/gui/MainWindow.ui"
  , "src/lib/gui/dialogs/*.ui"
 ]
-SPDX-FileCopyrightText = "Deskflow Developers"
+SPDX-FileCopyrightText = "(C) 2025 - 2026 Deskflow Developers"
 SPDX-License-Identifier = "GPL-2.0-only WITH LicenseRef-OpenSSL-Exception"

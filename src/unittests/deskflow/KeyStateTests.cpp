@@ -1,5 +1,6 @@
 /*
  * Deskflow -- mouse and keyboard sharing utility
+ * SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
  * SPDX-FileCopyrightText: (C) 2025 Chris Rizzitello <sithlord48@gmail.com>
  * SPDX-FileCopyrightText: (C) 2012 - 2016 Synergy App Ltd
  * SPDX-FileCopyrightText: (C) 2011 Nick Bolton
@@ -22,6 +23,7 @@ namespace {
 class RecordingKeyState : public KeyState
 {
 public:
+  using KeyState::synchronizeCapsLock;
   RecordingKeyState(IEventQueue *events, deskflow::KeyMap &keyMap, std::vector<std::string> layouts, bool langSync)
       : KeyState(events, keyMap, std::move(layouts), langSync)
   {
@@ -53,6 +55,11 @@ public:
   {
     m_faked.push_back(keystroke);
   }
+  void synchronizeInputMethod(const std::string &lang) override
+  {
+    m_syncedLanguages.push_back(lang);
+    m_strokesBeforeSync.push_back(m_faked.size());
+  }
 
   int countStrokes(Keystroke::KeyType type) const
   {
@@ -63,6 +70,8 @@ public:
 
   int32_t m_activeGroup = 0;
   std::vector<Keystroke> m_faked;
+  std::vector<std::string> m_syncedLanguages;
+  std::vector<size_t> m_strokesBeforeSync;
 };
 
 //! Two groups on one button: a latin key in group 0 ("en"), a thai key in group 1 ("th").
@@ -85,6 +94,38 @@ void buildTwoGroupKeyMap(deskflow::KeyMap &keyMap, KeyID enKey, KeyID thKey, Key
 constexpr KeyID kLatinA = 'a';
 constexpr KeyID kThaiFoFan = 0x0e1f; // ฟ, the same physical key as 'a' on a thai layout
 constexpr KeyButton kSharedButton = 1;
+constexpr KeyButton kCapsButton = 3;
+
+void buildCapsKeyMap(deskflow::KeyMap &keyMap)
+{
+  deskflow::KeyMap::KeyItem caps;
+  caps.m_id = kKeyCapsLock;
+  caps.m_button = kCapsButton;
+  deskflow::KeyMap::initModifierKey(caps);
+  keyMap.addKeyEntry(caps);
+  keyMap.finish();
+}
+
+// Supply a Windows-style repeat sequence so the common synthesis loop is tested
+// on Linux too, where KeyMap leaves repeats to the platform implementation.
+class RepeatKeyMap : public deskflow::KeyMap
+{
+public:
+  const KeyItem *mapKey(
+      Keystrokes &keys, KeyID, int32_t, ModifierToKeys &, KeyModifierMask &, KeyModifierMask, bool repeat,
+      const std::string &
+  ) const override
+  {
+    if (repeat) {
+      keys.emplace_back(kSharedButton, false, true, 0);
+    }
+    keys.emplace_back(kSharedButton, true, repeat, 0);
+    return &m_item;
+  }
+
+private:
+  KeyItem m_item{.m_id = kLatinA, .m_button = kSharedButton};
+};
 
 } // namespace
 
@@ -251,6 +292,131 @@ void KeyStateTests::fakeKeyDown_langSyncDisabled_keepsLocalGroup()
   QCOMPARE(keyState.countStrokes(deskflow::KeyMap::Keystroke::KeyType::Group), 0);
   QVERIFY(keyState.countStrokes(deskflow::KeyMap::Keystroke::KeyType::Button) > 0);
   QCOMPARE(keyState.m_faked.front().m_data.m_button.m_button, kSharedButton);
+}
+
+void KeyStateTests::fakeKeyDown_syncsInputMethodAfterGroupBeforeButton()
+{
+  MockEventQueue eventQueue;
+  deskflow::KeyMap keyMap;
+  buildTwoGroupKeyMap(keyMap, kLatinA, kThaiFoFan, kSharedButton);
+  RecordingKeyState keyState(&eventQueue, keyMap, {"en", "th"}, true);
+  keyState.fakeKeyDown(kThaiFoFan, 0, kSharedButton, "th");
+
+  QCOMPARE(keyState.m_syncedLanguages, (std::vector<std::string>{"th"}));
+  QCOMPARE(keyState.m_strokesBeforeSync, (std::vector<size_t>{1}));
+  QCOMPARE(keyState.m_faked[0].m_type, deskflow::KeyMap::Keystroke::KeyType::Group);
+  QCOMPARE(keyState.m_faked[1].m_type, deskflow::KeyMap::Keystroke::KeyType::Button);
+
+  keyState.fakeKeyUp(kSharedButton);
+  QCOMPARE(keyState.m_syncedLanguages.size(), size_t(1));
+}
+
+void KeyStateTests::fakeKeyRepeat_syncsInputMethod()
+{
+  MockEventQueue eventQueue;
+  RepeatKeyMap keyMap;
+  RecordingKeyState keyState(&eventQueue, keyMap, {"en", "th"}, true);
+  keyState.fakeKeyDown(kLatinA, 0, kSharedButton, "en");
+  QVERIFY(keyState.fakeKeyRepeat(kLatinA, 0, 3, kSharedButton, "en"));
+  QCOMPARE(keyState.m_syncedLanguages, (std::vector<std::string>{"en", "en"}));
+}
+
+void KeyStateTests::fakeKeyDown_inputMethodSyncDisabled()
+{
+  MockEventQueue eventQueue;
+  deskflow::KeyMap keyMap;
+  buildTwoGroupKeyMap(keyMap, kLatinA, kThaiFoFan, kSharedButton);
+  RecordingKeyState keyState(&eventQueue, keyMap, {"en", "th"}, false);
+  keyState.fakeKeyDown(kLatinA, 0, kSharedButton, "en");
+  QVERIFY(keyState.m_syncedLanguages.empty());
+}
+
+void KeyStateTests::fakeKeyDown_emptyLanguageDoesNotSyncInputMethod()
+{
+  MockEventQueue eventQueue;
+  deskflow::KeyMap keyMap;
+  buildTwoGroupKeyMap(keyMap, kLatinA, kThaiFoFan, kSharedButton);
+  RecordingKeyState keyState(&eventQueue, keyMap, {"en", "th"}, true);
+  keyState.fakeKeyDown(kLatinA, 0, kSharedButton, {});
+  QVERIFY(keyState.m_syncedLanguages.empty());
+}
+
+void KeyStateTests::synchronizeCapsLock_setsAndClearsState()
+{
+  MockEventQueue eventQueue;
+  deskflow::KeyMap keyMap;
+  buildCapsKeyMap(keyMap);
+  RecordingKeyState keyState(&eventQueue, keyMap, {"en"}, true);
+  keyState.setMacCapsLockSync(true);
+
+  keyState.synchronizeCapsLock(KeyModifierCapsLock);
+  QCOMPARE(keyState.getActiveModifiers(), KeyModifierCapsLock);
+  QCOMPARE(keyState.m_faked.size(), size_t(2));
+  QCOMPARE(keyState.m_faked[0].m_data.m_button.m_button, kCapsButton);
+  QVERIFY(keyState.m_faked[0].m_data.m_button.m_press);
+  QVERIFY(!keyState.m_faked[1].m_data.m_button.m_press);
+
+  keyState.synchronizeCapsLock(0);
+  QCOMPARE(keyState.getActiveModifiers(), KeyModifierMask(0));
+  QCOMPARE(keyState.m_faked.size(), size_t(4));
+  QVERIFY(keyState.m_syncedLanguages.empty());
+}
+
+void KeyStateTests::synchronizeCapsLock_matchingStateDoesNotToggle()
+{
+  MockEventQueue eventQueue;
+  deskflow::KeyMap keyMap;
+  buildCapsKeyMap(keyMap);
+  RecordingKeyState keyState(&eventQueue, keyMap, {"en"}, true);
+  keyState.setMacCapsLockSync(true);
+  keyState.synchronizeCapsLock(0);
+  QVERIFY(keyState.m_faked.empty());
+
+  keyState.synchronizeCapsLock(KeyModifierCapsLock);
+  keyState.m_faked.clear();
+  keyState.synchronizeCapsLock(KeyModifierCapsLock);
+  QVERIFY(keyState.m_faked.empty());
+}
+
+void KeyStateTests::synchronizeCapsLock_preservesOtherModifiers()
+{
+  MockEventQueue eventQueue;
+  deskflow::KeyMap keyMap;
+  buildCapsKeyMap(keyMap);
+  RecordingKeyState keyState(&eventQueue, keyMap, {"en"}, false);
+  keyState.setMacCapsLockSync(true);
+  keyState.onKey(0, true, KeyModifierControl | KeyModifierShift | KeyModifierNumLock);
+
+  keyState.synchronizeCapsLock(KeyModifierCapsLock);
+  QCOMPARE(
+      keyState.getActiveModifiers(), KeyModifierControl | KeyModifierShift | KeyModifierNumLock | KeyModifierCapsLock
+  );
+  keyState.synchronizeCapsLock(0);
+  QCOMPARE(keyState.getActiveModifiers(), KeyModifierControl | KeyModifierShift | KeyModifierNumLock);
+  for (const auto &stroke : keyState.m_faked) {
+    QCOMPARE(stroke.m_type, deskflow::KeyMap::Keystroke::KeyType::Button);
+    QCOMPARE(stroke.m_data.m_button.m_button, kCapsButton);
+  }
+}
+
+void KeyStateTests::synchronizeCapsLock_disabledLeavesStateAlone()
+{
+  MockEventQueue eventQueue;
+  deskflow::KeyMap keyMap;
+  buildCapsKeyMap(keyMap);
+  RecordingKeyState keyState(&eventQueue, keyMap, {"en"}, true);
+  QVERIFY(!keyState.isMacCapsLockSyncEnabled());
+  keyState.synchronizeCapsLock(KeyModifierCapsLock);
+  QCOMPARE(keyState.getActiveModifiers(), KeyModifierMask(0));
+  QVERIFY(keyState.m_faked.empty());
+
+  keyState.setMacCapsLockSync(true);
+  keyState.synchronizeCapsLock(KeyModifierCapsLock);
+  keyState.m_faked.clear();
+  keyState.setMacCapsLockSync(false);
+  keyState.synchronizeCapsLock(0);
+  QCOMPARE(keyState.getActiveModifiers(), KeyModifierCapsLock);
+  QVERIFY(keyState.m_faked.empty());
 }
 
 QTEST_MAIN(KeyStateTests)

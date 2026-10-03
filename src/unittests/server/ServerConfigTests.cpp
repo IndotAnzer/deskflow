@@ -1,5 +1,6 @@
 /*
  * Deskflow -- mouse and keyboard sharing utility
+ * SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
  * SPDX-FileCopyrightText: (C) 2025 Chris Rizzitello <sithlord48@gmail.com>
  * SPDX-FileCopyrightText: (C) 2014 - 2016 Synergy App Ltd
  * SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
@@ -7,7 +8,12 @@
 
 #include "ServerConfigTests.h"
 
+#include "common/Settings.h"
 #include "server/Config.h"
+
+#include <QScopeGuard>
+#include <QTemporaryDir>
+#include <sstream>
 
 class OnlySystemFilter : public InputFilter::Condition
 {
@@ -29,6 +35,11 @@ public:
 };
 
 using namespace deskflow::server;
+
+void ServerConfigTests::initTestCase()
+{
+  m_arch.init();
+}
 
 void ServerConfigTests::equalityCheck()
 {
@@ -159,6 +170,33 @@ void ServerConfigTests::equalityCheck_diff_neighbours3()
   QVERIFY(b.addComputer("computerC"));
   QVERIFY(b.connect("computerA", Direction::Bottom, 0.0f, 0.5f, "computerC", 0.5f, 1.0f));
   QVERIFY(a != b);
+}
+
+void ServerConfigTests::macCapsLockSync_optionFromSettings_data()
+{
+  QTest::addColumn<bool>("enabled");
+  QTest::newRow("disabled") << false;
+  QTest::newRow("enabled") << true;
+}
+
+void ServerConfigTests::macCapsLockSync_optionFromSettings()
+{
+  QFETCH(bool, enabled);
+  QTemporaryDir directory;
+  QVERIFY(directory.isValid());
+  const auto previousFile = Settings::settingsFile();
+  const auto restore = qScopeGuard([&] { Settings::setSettingsFile(previousFile); });
+  Settings::setSettingsFile(directory.filePath("Deskflow.conf"));
+  QCOMPARE(Settings::defaultValue(Settings::Server::MacCapsLockSync).toBool(), false);
+  Settings::setValue(Settings::Server::MacCapsLockSync, enabled);
+
+  std::istringstream input("section: options\nend\n");
+  Config config(nullptr);
+  input >> config;
+  const auto *options = config.getOptions("");
+  QVERIFY(options);
+  QVERIFY(options->contains(kOptionMacCapsLockSync));
+  QCOMPARE(options->at(kOptionMacCapsLockSync), OptionValue(enabled));
 }
 
 QTEST_MAIN(ServerConfigTests)

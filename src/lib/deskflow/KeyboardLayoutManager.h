@@ -1,5 +1,6 @@
 /*
  * Deskflow -- mouse and keyboard sharing utility
+ * SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
  * SPDX-FileCopyrightText: (C) 2014 - 2021 Synergy App Ltd
  * SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
  */
@@ -17,6 +18,9 @@ class KeyboardLayoutManager
   std::vector<std::string> m_localLayouts;
 
 public:
+  //! Convert an input-source language tag (e.g. zh-Hans) to the two-letter protocol language.
+  static std::string normalizeLanguageCode(std::string_view language);
+
   explicit KeyboardLayoutManager(
       const std::vector<std::string> &localLayouts = AppUtil::instance().getKeyboardLayoutList()
   );
