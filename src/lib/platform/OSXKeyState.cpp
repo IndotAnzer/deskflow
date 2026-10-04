@@ -135,6 +135,11 @@ static const KeyEntry s_controlKeys[] = {
 
 namespace {
 
+std::string inputSourceIDForLog(CFStringRef id)
+{
+  return id ? QString::fromCFString(id).toStdString() : "<null>";
+}
+
 io_connect_t getService(io_iterator_t iter)
 {
   io_connect_t service = 0;
@@ -483,7 +488,40 @@ int32_t OSXKeyState::pollActiveGroup() const
 
   GroupMap::const_iterator i = m_groupMap.find(id);
   if (i != m_groupMap.end()) {
+    LOG_DEBUG(
+        "mac group diagnostic: layout-id=\"%s\" address=%p result=match group=%d", inputSourceIDForLog(id).c_str(),
+        static_cast<const void *>(id), i->second
+    );
     return i->second;
+  }
+
+  LOG_INFO(
+      "mac group diagnostic: layout-id=\"%s\" address=%p result=missing", inputSourceIDForLog(id).c_str(),
+      static_cast<const void *>(id)
+  );
+  AutoTISInputSourceRef selected(nullptr, CFRelease);
+  AutoTISInputSourceRef ascii(nullptr, CFRelease);
+  CFStringRef selectedID = nullptr;
+  CFStringRef asciiID = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(g_tisMutex);
+    selected = AutoTISInputSourceRef(TISCopyCurrentKeyboardInputSource(), CFRelease);
+    ascii = AutoTISInputSourceRef(TISCopyCurrentASCIICapableKeyboardLayoutInputSource(), CFRelease);
+    if (selected)
+      selectedID = (CFStringRef)TISGetInputSourceProperty(selected.get(), kTISPropertyInputSourceID);
+    if (ascii)
+      asciiID = (CFStringRef)TISGetInputSourceProperty(ascii.get(), kTISPropertyInputSourceID);
+  }
+  LOG_INFO(
+      "mac group diagnostic: selected-id=\"%s\" address=%p ascii-layout-id=\"%s\" address=%p",
+      inputSourceIDForLog(selectedID).c_str(), static_cast<const void *>(selectedID),
+      inputSourceIDForLog(asciiID).c_str(), static_cast<const void *>(asciiID)
+  );
+  for (const auto &[mappedID, group] : m_groupMap) {
+    LOG_INFO(
+        "mac group diagnostic: mapped group=%d id=\"%s\" address=%p", group, inputSourceIDForLog(mappedID).c_str(),
+        static_cast<const void *>(mappedID)
+    );
   }
 
   LOG_WARN("can't get the active group, use the first group instead");
@@ -512,6 +550,7 @@ void OSXKeyState::getKeyMap(deskflow::KeyMap &keyMap)
   if (getGroups(m_groups)) {
     m_groupMap.clear();
     numGroups = CFArrayGetCount(m_groups.get());
+    LOG_INFO("mac group diagnostic: rebuild groups=%d", numGroups);
     for (int32_t g = 0; g < numGroups; ++g) {
       TISInputSourceRef keyboardLayout = (TISInputSourceRef)CFArrayGetValueAtIndex(m_groups.get(), g);
       CFStringRef id = nullptr;
@@ -520,6 +559,10 @@ void OSXKeyState::getKeyMap(deskflow::KeyMap &keyMap)
         id = (CFStringRef)TISGetInputSourceProperty(keyboardLayout, kTISPropertyInputSourceID);
       }
       m_groupMap[id] = g;
+      LOG_INFO(
+          "mac group diagnostic: build group=%d id=\"%s\" address=%p", g, inputSourceIDForLog(id).c_str(),
+          static_cast<const void *>(id)
+      );
     }
   }
 
