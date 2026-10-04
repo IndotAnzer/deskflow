@@ -1,0 +1,146 @@
+# SPDX-License-Identifier: MIT
+name: Mac input source group diagnostics test installer
+
+on:
+  push:
+    branches:
+      - 'build/macos-group-diagnostics'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: group-diagnostics-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: macos-arm64
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - name: Checkout comparator test source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-dependencies
+        with:
+          qt-version: 6.11.3
+
+      - name: Check diagnostic source isolation
+        run: |
+          python3 - <<'CHECK'
+          import subprocess
+          comparator = '580d8ac2f0d916dc9b0b816a768c4b66b40c2ea1'
+          source = 'fe083a7c4f387440d5090311b95caf8224c8c3c2'
+          changes = subprocess.check_output(['git', 'diff', '--numstat', comparator, source], text=True).strip()
+          assert changes == '43\t0\tsrc/lib/platform/OSXKeyState.cpp', changes
+          packaging = subprocess.check_output(['git', 'diff', '--name-only', source, 'HEAD'], text=True).splitlines()
+          assert packaging == ['.github/actions/install-dependencies/aqt.ini', '.github/workflows/group-diagnostics.yml', 'deploy/mac/deploy.cmake'], packaging
+          print('Diagnostic source isolation passed: only additive diagnostic code differs from comparator test source.')
+          CHECK
+
+      - name: Configure
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_INSTALLER=ON \
+            -DSKIP_BUILD_TESTS=ON -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
+            -DPACKAGE_VERSION_LABEL="group-diagnostics-${GITHUB_SHA:0:8}" \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14
+
+      - name: Build installer
+        run: |
+          cmake --build build --config Release --parallel 8
+          for attempt in 1 2 3 4 5; do
+            if cmake --build build --config Release --parallel 8 --target package; then
+              test -n "$(find build -maxdepth 1 -name '*.dmg' -print -quit)"
+              exit 0
+            fi
+            echo "Retrying DMG packaging (attempt $attempt)"
+            sleep 1
+          done
+          exit 1
+
+      - name: Verify packaged executable
+        uses: ./.github/actions/test-package
+
+      - name: Validate signatures and start packaged GUI
+        run: |
+          dmg=$(find build -maxdepth 1 -name '*.dmg' -print -quit)
+          echo Y | hdiutil attach "$dmg" -nobrowse -mountpoint /tmp/deskflow-signfix-dmg
+          trap 'hdiutil detach /tmp/deskflow-signfix-dmg' EXIT
+          ditto /tmp/deskflow-signfix-dmg/Deskflow.app /tmp/Deskflow-signfix.app
+          app=/tmp/Deskflow-signfix.app
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dv --verbose=4 "$app" 2>build/GUI-SIGNATURE.txt
+          codesign -dv --verbose=4 "$app/Contents/Frameworks/QtWidgets.framework" 2>build/QTWIDGETS-SIGNATURE.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          gui = Path('build/GUI-SIGNATURE.txt').read_text()
+          qt = Path('build/QTWIDGETS-SIGNATURE.txt').read_text()
+          print(gui, qt)
+          assert 'TeamIdentifier=not set' in gui
+          assert 'TeamIdentifier=not set' in qt
+          assert not any('runtime' in line for line in gui.splitlines() if line.startswith('CodeDirectory '))
+          PY
+          env -u QT_PLUGIN_PATH -u QT_ROOT_DIR -u QML2_IMPORT_PATH \
+            -u DYLD_LIBRARY_PATH -u DYLD_FRAMEWORK_PATH -u DYLD_FALLBACK_LIBRARY_PATH \
+            "$app/Contents/MacOS/Deskflow" --version >build/GUI-STARTUP.txt 2>&1
+          cat build/GUI-STARTUP.txt
+          env -u QT_PLUGIN_PATH -u QT_ROOT_DIR -u QML2_IMPORT_PATH \
+            -u DYLD_LIBRARY_PATH -u DYLD_FRAMEWORK_PATH -u DYLD_FALLBACK_LIBRARY_PATH \
+            "$app/Contents/MacOS/deskflow-core" --version
+      - name: Native unit tests
+        id: tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build/src/unittests --output-on-failure
+
+      - name: Package build information and checksums
+        run: |
+          {
+            echo "Upstream baseline: v1.27.0 (081f6478e654a112168879e67a41ce7d7e4ae3af)"
+            echo "Diagnostic source commit: fe083a7c4f387440d5090311b95caf8224c8c3c2"
+            echo "Comparator-only source commit: 580d8ac2f0d916dc9b0b816a768c4b66b40c2ea1"
+            echo "Package commit: $GITHUB_SHA"
+            echo "Native unit tests: ${{ steps.tests.outcome }}"
+            echo "Adds group build IDs, lookup ID and pointers, lookup result, selected source and ASCII layout IDs."
+            echo "Enable DEBUG logging to include successful lookups; failed lookups and build entries are INFO."
+            echo "Retains comparator test behavior, original enumeration, layout query, group indices, fallback and map update paths."
+            echo "No language-tag, Windows buffer, Caps Lock sync, protocol or unit-test changes."
+            echo "Diagnostic-only test build; not a fix for the reported warning."
+            echo "Packaging-only files add CI, Qt download concurrency and consistent ad-hoc bundle signing."
+            echo "Existing PRs and other build branches are unchanged."
+            echo "Test installer: ad-hoc signed, without Apple Developer ID notarization."
+            cat build/GUI-STARTUP.txt
+          } > build/BUILD-INFO.txt
+          (cd build && shasum -a 256 *.dmg > SHA256SUMS.txt)
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: deskflow-group-diagnostics-macos-arm64
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            build/*.dmg
+            build/BUILD-INFO.txt
+            build/SHA256SUMS.txt
+            build/src/unittests/Testing/Temporary/LastTest.log
+            build/GUI-SIGNATURE.txt
+            build/QTWIDGETS-SIGNATURE.txt
+            build/GUI-STARTUP.txt
+
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: deskflow-group-diagnostics-diagnostics
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            build/GUI-*.txt
+            build/QTWIDGETS-SIGNATURE.txt
+            build/src/unittests/Testing/Temporary/LastTest.log
