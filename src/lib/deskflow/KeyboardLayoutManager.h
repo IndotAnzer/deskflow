@@ -17,8 +17,11 @@ class KeyboardLayoutManager
   std::vector<std::string> m_localLayouts;
 
 public:
-  //! Convert an input-source language tag (e.g. zh-Hans) to the two-letter protocol language.
-  static std::string normalizeLanguageCode(std::string_view language);
+  //! Extract an ISO 639-1 code from a platform language tag for layout matching.
+  //! Returns empty for an unknown language or one without an ISO 639-1 code.
+  //! This does not validate the complete language tag. The layout-list protocol
+  //! currently encodes each language as exactly two characters.
+  static std::string languageForISO639_1(std::string_view languageTag);
 
   explicit KeyboardLayoutManager(
       const std::vector<std::string> &localLayouts = AppUtil::instance().getKeyboardLayoutList()

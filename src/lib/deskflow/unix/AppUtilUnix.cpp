@@ -68,8 +68,8 @@ std::vector<std::string> AppUtilUnix::getKeyboardLayoutList()
         continue;
       }
 
-      const auto langCode = deskflow::KeyboardLayoutManager::normalizeLanguageCode(temporaryCString);
-      if (langCode.size() == 2 &&
+      const auto langCode = deskflow::KeyboardLayoutManager::languageForISO639_1(temporaryCString);
+      if (!langCode.empty() &&
           std::find(layoutLangCodes.begin(), layoutLangCodes.end(), langCode) == layoutLangCodes.end()) {
         layoutLangCodes.push_back(langCode);
       }
@@ -154,7 +154,7 @@ std::string AppUtilUnix::getCurrentLanguageCode()
       continue;
     }
 
-    result = deskflow::KeyboardLayoutManager::normalizeLanguageCode(temporaryCString);
+    result = deskflow::KeyboardLayoutManager::languageForISO639_1(temporaryCString);
     break;
   }
 #endif

@@ -7,6 +7,8 @@
 #include "KeyboardLayoutManager.h"
 #include "base/Log.h"
 
+#include <QLocale>
+
 #include <algorithm>
 
 namespace {
@@ -27,22 +29,17 @@ std::string vectorToString(const std::vector<std::string> &vector, const std::st
 
 namespace deskflow {
 
-std::string KeyboardLayoutManager::normalizeLanguageCode(std::string_view language)
+std::string KeyboardLayoutManager::languageForISO639_1(std::string_view languageTag)
 {
-  const auto separator = language.find_first_of("-_");
-  language = language.substr(0, separator);
-  if (language.size() != 2) {
+  // Platform tags may use BCP 47 hyphens or locale-style underscores. Script,
+  // region and variant subtags do not affect language-level layout matching.
+  const auto primary = languageTag.substr(0, languageTag.find_first_of("-_"));
+  const auto code = QString::fromUtf8(primary.data(), static_cast<qsizetype>(primary.size())).toLower();
+  const auto language = QLocale::codeToLanguage(code);
+  if (language == QLocale::C) {
     return {};
   }
-  std::string code(language);
-  for (auto &letter : code) {
-    if (letter >= 'A' && letter <= 'Z') {
-      letter += 'a' - 'A';
-    } else if (letter < 'a' || letter > 'z') {
-      return {};
-    }
-  }
-  return code;
+  return QLocale::languageToCode(language, QLocale::ISO639Part1).toStdString();
 }
 
 KeyboardLayoutManager::KeyboardLayoutManager(const std::vector<std::string> &localLayouts)

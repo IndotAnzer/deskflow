@@ -27,6 +27,30 @@
 #include <Windows.h>
 #include <conio.h>
 
+namespace {
+
+std::string languageForKeyboardLayout(HKL layout)
+{
+  if (!layout) {
+    return {};
+  }
+  const auto locale = MAKELCID(LOWORD(reinterpret_cast<ULONG_PTR>(layout)), SORT_DEFAULT);
+  // The size returned by GetLocaleInfoA includes the terminating NUL.
+  const int size = GetLocaleInfoA(locale, LOCALE_SISO639LANGNAME, nullptr, 0);
+  if (size <= 1) {
+    return {};
+  }
+  std::string code(size, '\0');
+  const int written = GetLocaleInfoA(locale, LOCALE_SISO639LANGNAME, code.data(), size);
+  if (written <= 1) {
+    return {};
+  }
+  code.resize(written - 1);
+  return deskflow::KeyboardLayoutManager::languageForISO639_1(code);
+}
+
+} // namespace
+
 AppUtilWindows::AppUtilWindows(IEventQueue *events) : m_events(events), m_exitMode(kExitModeNormal)
 {
   if (SetConsoleCtrlHandler((PHANDLER_ROUTINE)consoleHandler, TRUE) == FALSE) {
@@ -136,13 +160,8 @@ std::vector<std::string> AppUtilWindows::getKeyboardLayoutList()
     uLayouts = GetKeyboardLayoutList(uLayouts, lpList);
 
     for (int i = 0; i < uLayouts; ++i) {
-      // GetLocaleInfoA includes the terminating NUL in its required buffer size.
-      char code[9] = {};
-      GetLocaleInfoA(
-          MAKELCID(((ULONG_PTR)lpList[i] & 0xffffffff), SORT_DEFAULT), LOCALE_SISO639LANGNAME, &code[0],
-          static_cast<int>(sizeof(code))
-      );
-      layoutLangCodes.push_back(deskflow::KeyboardLayoutManager::normalizeLanguageCode(code));
+      // Preserve the layout index even when its language cannot be represented.
+      layoutLangCodes.push_back(languageForKeyboardLayout(lpList[i]));
     }
 
     if (lpList) {
@@ -154,15 +173,7 @@ std::vector<std::string> AppUtilWindows::getKeyboardLayoutList()
 
 std::string AppUtilWindows::getCurrentLanguageCode()
 {
-  char code[9] = {};
-
-  auto hklLayout = getCurrentKeyboardLayout();
-  if (hklLayout) {
-    auto localLayoutID = MAKELCID(LOWORD(hklLayout), SORT_DEFAULT);
-    GetLocaleInfoA(localLayoutID, LOCALE_SISO639LANGNAME, &code[0], static_cast<int>(sizeof(code)));
-  }
-
-  return deskflow::KeyboardLayoutManager::normalizeLanguageCode(code);
+  return languageForKeyboardLayout(getCurrentKeyboardLayout());
 }
 
 HKL AppUtilWindows::getCurrentKeyboardLayout() const
